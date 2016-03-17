@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Hello WebSocket</title>
+</head>
+<body onload="disconnect()">
+	<div>
+		<div>
+			<button id="connect" onclick="connect();">Connect</button>
+			<button id="disconnect" disabled="disabled" onclick="disconnect();">Disconnect</button>
+		</div>
+		<div id="conversationDiv">
+			<button id="sendTest" onclick="sendTest();">Test</button>
+			<label>What is your name?</label><input type="text" id="name" />
+			<button id="sendName" onclick="sendName();">Send</button>
+			<p id="response"></p>
+		</div>
+	</div>
+
+	<script src="/webjars/jquery/2.2.1/dist/jquery.min.js"></script>
+	<script src="/webjars/stomp-websocket/2.3.4/lib/stomp.min.js"></script>
+	<script src="/webjars/sockjs-client/1.0.3/dist/sockjs-1.0.3.min.js"></script>
+	<script type="text/javascript">
+		var stompClient = null;
+
+		function setConnected(connected) {
+			$('#connect').attr("disabled", connected);
+			$('#disconnect').attr("disabled", !connected);
+			$('#conversationDiv').css('visibility', connected ? 'visible' : 'hidden');
+			$('#response')[0].innerHTML = '';
+		}
+
+		function connect() {
+			var socket = new SockJS('/hello');
+			stompClient = Stomp.over(socket);
+			stompClient.connect({}, function(frame) {
+				setConnected(true);
+				console.log('Connected: ' + frame);
+				stompClient.subscribe('/topic/v1/greetings',
+						function(greeting) {
+							showGreeting(JSON.parse(greeting.body).content);
+						});
+				stompClient.subscribe('/topic/v1/test', function(greeting) {
+					showGreeting(JSON.parse(greeting.body).content);
+				});
+				stompClient.subscribe('/topic/v1/progress', handleProgress);
+			});
+		}
+
+		function disconnect() {
+			if (stompClient != null) {
+				stompClient.disconnect();
+			}
+			setConnected(false);
+			console.log("Disconnected");
+		}
+
+		function handleProgress(greeting) {
+			showGreeting("progress : " + JSON.parse(greeting.body).content);
+		}
+
+		function showGreeting(message) {
+			var response = document.getElementById('response');
+			var p = document.createElement('p');
+			p.style.wordWrap = 'break-word';
+			p.appendChild(document.createTextNode(message));
+			response.insertBefore(p, response.firstChild);
+		}
+
+		function sendName() {
+			var name = $('#name').val();
+			stompClient.send("/app/v1/hello", {}, JSON.stringify({
+				'name' : name
+			}));
+		}
+
+		$('#sendTest').click(function () {
+			stompClient.send("/app/v1/test", {}, JSON.stringify({
+				'name' : "OK"
+			}));
+	    });
+	</script>
+</body>
+</html>
